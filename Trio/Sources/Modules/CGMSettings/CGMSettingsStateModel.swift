@@ -118,6 +118,12 @@ extension CGMSettings {
                 on: $appleHealthAcceptUserEntered,
                 initial: { appleHealthAcceptUserEntered = $0 }
             )
+
+            lastGlucoseDate = glucoseStorage.lastGlucoseDate()
+            glucoseStorage.updatePublisher
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] in self?.lastGlucoseDate = self?.glucoseStorage.lastGlucoseDate() }
+                .store(in: &lifetime)
         }
 
         /// Asks for read access (iOS shows the sheet only the first time) and reloads the apps that write glucose.
@@ -127,8 +133,10 @@ extension CGMSettings {
             } catch {
                 warning(.service, "Apple Health read authorization failed", error: error)
             }
+            var seenBundleIDs = Set<String>()
             appleHealthSources = await HealthKitGlucoseSource.glucoseSources(healthKitStore)
                 .map { AppleHealthSourceOption(bundleID: $0.bundleIdentifier, name: $0.name) }
+                .filter { seenBundleIDs.insert($0.bundleID).inserted }
             lastGlucoseDate = glucoseStorage.lastGlucoseDate()
         }
 
