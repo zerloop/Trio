@@ -1139,7 +1139,7 @@
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Son değer"
+            "value" : "Son ölçüm"
           }
         }
       }
@@ -1172,7 +1172,7 @@
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Henüz değer yok"
+            "value" : "Henüz ölçüm yok"
           }
         }
       }
