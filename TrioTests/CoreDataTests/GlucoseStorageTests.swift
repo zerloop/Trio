@@ -27,7 +27,7 @@ import Testing
             UIAssembly(),
             SecurityAssembly(),
             TestAssembly(testContext: testContext) // Add our test assembly last to override Storage
-        ])
+        ], parent: nil, defaultObjectScope: .container)
 
         resolver = assembler.resolver
         injectServices(resolver)
