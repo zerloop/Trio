@@ -257,7 +257,8 @@ final class BaseGlucoseStorage: GlucoseStorage, Injectable {
         entry.date = glucose.dateString
         entry.direction = glucose.direction?.rawValue
         entry.isUploadedToNS = false
-        entry.isUploadedToHealth = false
+        // Readings that came from Apple Health are already there; uploading them would duplicate every value.
+        entry.isUploadedToHealth = settingsManager.settings.cgm == .appleHealth
         entry.isUploadedToTidepool = false
     }
 
