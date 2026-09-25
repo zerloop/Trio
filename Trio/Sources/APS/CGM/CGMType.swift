@@ -5,6 +5,7 @@ enum CGMType: String, JSON, CaseIterable, Identifiable {
     case none
     case nightscout
     case xdrip
+    case appleHealth
     case simulator
     case plugin
 
@@ -16,6 +17,8 @@ enum CGMType: String, JSON, CaseIterable, Identifiable {
             return "Nightscout as CGM"
         case .xdrip:
             return "xDrip4iOS"
+        case .appleHealth:
+            return "Apple Health"
         case .simulator:
             return String(localized: "Glucose Simulator", comment: "Glucose Simulator CGM type")
         case .plugin:
@@ -25,7 +28,8 @@ enum CGMType: String, JSON, CaseIterable, Identifiable {
 
     var appURL: URL? {
         switch self {
-        case .nightscout,
+        case .appleHealth,
+             .nightscout,
              .none:
             return nil
         case .xdrip:
@@ -56,6 +60,11 @@ enum CGMType: String, JSON, CaseIterable, Identifiable {
                 localized:
                 "Using shared app group with external CGM app xDrip4iOS",
                 comment: "Shared app group xDrip4iOS"
+            )
+        case .appleHealth:
+            return String(
+                localized: "Reads glucose that a CGM app such as Instara (Perlanova) writes to Apple Health",
+                comment: "Apple Health CGM source subtitle"
             )
         case .simulator:
             return String(localized: "Glucose Simulator for Demo Only", comment: "Simple simulator")

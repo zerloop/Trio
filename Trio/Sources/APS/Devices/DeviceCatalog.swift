@@ -391,6 +391,7 @@ extension DeviceCatalog {
 
         CGMCatalogEntry(.native(.nightscout), manufacturer: .otherSources, icon: .trio(asset: "owl")),
         CGMCatalogEntry(.native(.xdrip), manufacturer: .otherSources),
+        CGMCatalogEntry(.native(.appleHealth), manufacturer: .otherSources),
 
         CGMCatalogEntry(
             .native(.simulator),

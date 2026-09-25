@@ -146,7 +146,8 @@ extension CGMSettings {
             .navigationTitle("CGM")
             .sheet(isPresented: $state.shouldDisplayCGMSetupSheet) {
                 switch state.cgmCurrent.type {
-                case .nightscout,
+                case .appleHealth,
+                     .nightscout,
                      .none,
                      .simulator,
                      .xdrip:

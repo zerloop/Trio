@@ -25,6 +25,10 @@ struct TrioSettings: JSON, Equatable, Encodable {
     var debugOptions: Bool = false
     var cgm: CGMType = .none
     var cgmPluginIdentifier: String = ""
+    /// Bundle id of the app whose Apple Health glucose Trio treats as CGM readings.
+    var appleHealthCGMSourceBundleID: String?
+    /// Testing aid: also accept glucose typed into Health by hand.
+    var appleHealthCGMAcceptUserEntered: Bool = false
     var uploadGlucose: Bool = true
     var useCalendar: Bool = false
     var displayCalendarIOBandCOB: Bool = false
@@ -167,6 +171,14 @@ extension TrioSettings: Decodable {
 
         if let cgmPluginIdentifier = try? container.decode(String.self, forKey: .cgmPluginIdentifier) {
             settings.cgmPluginIdentifier = cgmPluginIdentifier
+        }
+
+        if let appleHealthCGMSourceBundleID = try? container.decode(String.self, forKey: .appleHealthCGMSourceBundleID) {
+            settings.appleHealthCGMSourceBundleID = appleHealthCGMSourceBundleID
+        }
+
+        if let appleHealthCGMAcceptUserEntered = try? container.decode(Bool.self, forKey: .appleHealthCGMAcceptUserEntered) {
+            settings.appleHealthCGMAcceptUserEntered = appleHealthCGMAcceptUserEntered
         }
 
         if let uploadGlucose = try? container.decode(Bool.self, forKey: .uploadGlucose) {
