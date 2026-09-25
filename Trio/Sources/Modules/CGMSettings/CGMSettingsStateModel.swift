@@ -67,6 +67,7 @@ extension CGMSettings {
         @Published var lastGlucoseDate: Date?
 
         var shouldRunDeleteOnSettingsChange = true
+        private var lastGlucoseDateCancellable: AnyCancellable?
 
         override func subscribe() {
             units = settingsManager.settings.units
@@ -120,10 +121,11 @@ extension CGMSettings {
             )
 
             lastGlucoseDate = glucoseStorage.lastGlucoseDate()
-            glucoseStorage.updatePublisher
+            lastGlucoseDateCancellable = glucoseStorage.updatePublisher
+                .receive(on: DispatchQueue.global(qos: .utility))
+                .map { [weak self] _ in self?.glucoseStorage.lastGlucoseDate() }
                 .receive(on: DispatchQueue.main)
-                .sink { [weak self] in self?.lastGlucoseDate = self?.glucoseStorage.lastGlucoseDate() }
-                .store(in: &lifetime)
+                .sink { [weak self] date in self?.lastGlucoseDate = date }
         }
 
         /// Asks for read access (iOS shows the sheet only the first time) and reloads the apps that write glucose.
