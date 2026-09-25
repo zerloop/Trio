@@ -21,6 +21,11 @@ struct HealthKitAnchorStore {
         defaults.set(data, forKey: key(for: sourceBundleID))
     }
 
+    /// Forgets the anchor for a source, so the next query rescans the last 24 hours.
+    func remove(for sourceBundleID: String) {
+        defaults.removeObject(forKey: key(for: sourceBundleID))
+    }
+
     private func key(for sourceBundleID: String) -> String {
         "AppleHealthCGM.anchor.\(sourceBundleID)"
     }

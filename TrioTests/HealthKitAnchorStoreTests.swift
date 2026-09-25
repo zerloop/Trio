@@ -32,4 +32,14 @@ import Testing
         store.save(HKQueryAnchor(fromValue: 7), for: "com.apple.Health")
         #expect(try archived(store.anchor(for: "com.teljane.instara")) == archived(HKQueryAnchor(fromValue: 42)))
     }
+
+    @Test("Removing an anchor forgets it") func removingAnAnchorForgetsIt() {
+        let store = makeStore()
+        store.save(HKQueryAnchor(fromValue: 42), for: "com.teljane.instara")
+        store.remove(for: "com.teljane.instara")
+        #expect(store.anchor(for: "com.teljane.instara") == nil)
+
+        // Removing an unknown source does not throw or crash.
+        store.remove(for: "com.unknown.source")
+    }
 }

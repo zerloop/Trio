@@ -24,8 +24,11 @@ final class HealthKitGlucoseSource: GlucoseSource {
     private let anchorStore: HealthKitAnchorStore
     private let settings: () -> Settings
     private let queue = DispatchQueue(label: "HealthKitGlucoseSource.queue")
+    /// Guarded by `queue`.
     private var observerQuery: HKObserverQuery?
-    /// Readings from the last few minutes, so the next reading can get a trend arrow.
+    /// Guarded by `queue`. True while `start()` is waiting on `requestAuthorization`.
+    private var isStarting = false
+    /// Readings from the last few minutes, so the next reading can get a trend arrow. Guarded by `queue`.
     private var recent: [BloodGlucose] = []
 
     init(
@@ -40,8 +43,38 @@ final class HealthKitGlucoseSource: GlucoseSource {
         self.glucoseManager = glucoseManager
     }
 
+    /// Requests read authorization, then registers the observer and background delivery once the user has
+    /// answered. Idempotent: does nothing if an observer is already registered or a registration is in flight.
+    /// Subsequent `requestAuthorization` calls complete immediately once the user has answered, so calling this
+    /// repeatedly (e.g. from `fetch` after a dead observer) is safe.
     func start() {
-        guard observerQuery == nil, let type = AppleHealthConfig.healthBGObject else { return }
+        guard let type = AppleHealthConfig.healthBGObject else { return }
+        let shouldStart: Bool = queue.sync {
+            guard observerQuery == nil, !isStarting else { return false }
+            isStarting = true
+            return true
+        }
+        guard shouldStart else { return }
+
+        healthStore.requestAuthorization(toShare: [], read: [type]) { [weak self] success, error in
+            guard let self else { return }
+            self.queue.async {
+                self.isStarting = false
+                guard error == nil, success else {
+                    if let error {
+                        warning(.service, "Apple Health glucose read authorization failed", error: error)
+                    }
+                    return
+                }
+                // Another start() may have raced and already registered while this one waited.
+                guard self.observerQuery == nil else { return }
+                self.registerObserver(type: type)
+            }
+        }
+    }
+
+    /// Must be called on `queue`.
+    private func registerObserver(type: HKSampleType) {
         let query = HKObserverQuery(sampleType: type, predicate: nil) { [weak self] _, completion, error in
             guard let self else {
                 completion()
@@ -49,6 +82,12 @@ final class HealthKitGlucoseSource: GlucoseSource {
             }
             if let error {
                 warning(.service, "Apple Health glucose observer failed", error: error)
+                self.queue.async {
+                    if let current = self.observerQuery {
+                        self.healthStore.stop(current)
+                    }
+                    self.observerQuery = nil
+                }
                 completion()
                 return
             }
@@ -69,10 +108,15 @@ final class HealthKitGlucoseSource: GlucoseSource {
     }
 
     func stop() {
-        if let observerQuery {
-            healthStore.stop(observerQuery)
+        queue.sync {
+            if let observerQuery {
+                healthStore.stop(observerQuery)
+            }
+            observerQuery = nil
+            // Any reading already in flight must not land under whatever CGM is selected next.
+            glucoseManager = nil
+            recent = []
         }
-        observerQuery = nil
         guard let type = AppleHealthConfig.healthBGObject else { return }
         // Only glucose: disabling everything would also cut delivery other Trio features may register.
         healthStore.disableBackgroundDelivery(for: type) { _, _ in }
@@ -83,6 +127,11 @@ final class HealthKitGlucoseSource: GlucoseSource {
             guard let self else {
                 promise(.success([]))
                 return
+            }
+            // A terminated observer comes back within a minute, without any protocol change.
+            let needsStart: Bool = self.queue.sync { self.observerQuery == nil && !self.isStarting }
+            if needsStart {
+                self.start()
             }
             self.readNewSamples { promise(.success($0)) }
         }
@@ -120,9 +169,17 @@ final class HealthKitGlucoseSource: GlucoseSource {
             }
             self.queue.async {
                 if let error {
-                    // Expected while the iPhone is locked (errorDatabaseInaccessible). The anchor is left as it
-                    // was, so the backlog is read after unlock.
-                    debug(.deviceManager, "Apple Health glucose query failed: \(error.localizedDescription)")
+                    // `HKError` here must be `HealthKit.HKError`: Trio also defines its own `HKError` enum
+                    // (in HealthKitManager.swift), which would otherwise shadow HealthKit's type.
+                    if (error as? HealthKit.HKError)?.code == .errorDatabaseInaccessible {
+                        // Expected while the iPhone is locked. The anchor is left as it was, so the backlog is
+                        // read after unlock.
+                        debug(.deviceManager, "Apple Health glucose query failed: \(error.localizedDescription)")
+                    } else {
+                        warning(.service, "Apple Health glucose query failed", error: error)
+                        // Drop the anchor so the next query rescans the last 24 h; central dedup absorbs repeats.
+                        self.anchorStore.remove(for: sourceBundleID)
+                    }
                     completion([])
                     return
                 }
