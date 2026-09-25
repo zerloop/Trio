@@ -11,7 +11,7 @@ Success: with the Instara app sharing to Health and the new source selected, Tri
 
 ## Known limitation (accepted)
 
-HealthKit data is encrypted while the iPhone is locked; no app can read it then. While locked, Trio receives no new glucose, the existing 6-minute staleness rule stops the loop, and overnight protection is weak. On unlock, the backlog is read and the loop resumes. The user accepted this. The settings screen states it permanently.
+HealthKit data is encrypted while the iPhone is locked; no app can read it then. While locked, Trio receives no new glucose; the loop's own stale-glucose gate stops it after 12 minutes without a new reading (`APSManager.swift`), while the home screen marks data stale after 6 minutes, and overnight protection is weak. On unlock, the backlog is read and the loop resumes. The user accepted this. The settings screen states it permanently.
 
 ## Out of scope
 
@@ -71,7 +71,7 @@ Heartbeat: the source provides no BLE heartbeat (`cgmProvidesHeartbeat` stays fa
 | Device locked (`HKError.errorDatabaseInaccessible`) | Log, deliver nothing, keep anchor; next observer fire/tick after unlock reads the backlog. Older readings take the backfill path. |
 | Read permission denied | Queries return empty; settings shows the "no data" warning. |
 | Source app not selected | Source delivers nothing; settings prompts to pick one. |
-| Data late or stopped | Existing staleness (6 min) stops the loop; settings shows reading age. |
+| Data late or stopped | The loop's stale-glucose gate (12 min) stops the loop; the home screen marks data stale after 6 min; settings shows reading age. |
 | Source changed | Anchor discarded, 24 h rescan, central dedup drops duplicates. |
 | Sample deleted in Health | Ignored. |
 | Switched to another CGM | Observer stopped, background delivery disabled for blood glucose only. |
