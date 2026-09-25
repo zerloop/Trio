@@ -1095,7 +1095,7 @@
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld dk önce"
+            "value" : "%lld dk. önce"
           }
         }
       }
@@ -1117,7 +1117,7 @@
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iPhone kilitliyken Apple Sağlık okunamaz. Kilidi açana kadar Trio yeni glukoz almaz ve döngü çalışmaz."
+            "value" : "iPhone kilitliyken Apple Health okunamaz. Kilidi açana kadar Trio yeni glukoz almaz ve döngü çalışmaz."
           }
         }
       }
@@ -1150,7 +1150,7 @@
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Henüz hiçbir uygulama Apple Sağlık'a kan şekeri yazmadı. Önce Instara'da Apple Sağlık paylaşımını açın."
+            "value" : "Henüz hiçbir uygulama Apple Health'e glukoz yazmadı. Önce Instara'da Apple Health paylaşımını açın."
           }
         }
       }
@@ -1161,7 +1161,7 @@
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "15 dakikadır Apple Sağlık'tan glukoz gelmedi. Instara'nın Apple Sağlık'a paylaştığını ve Trio'nun okuma izni olduğunu kontrol edin."
+            "value" : "15 dakikadır Apple Health'ten glukoz gelmedi. Instara'nın Apple Health'e paylaştığını ve Trio'nun okuma izni olduğunu kontrol edin."
           }
         }
       }
@@ -1183,7 +1183,7 @@
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Instara (Perlanova) gibi bir CGM uygulamasının Apple Sağlık'a yazdığı glukozu okur"
+            "value" : "Instara (Perlanova) gibi bir CGM uygulamasının Apple Health'e yazdığı glukozu okur"
           }
         }
       }
@@ -1194,7 +1194,7 @@
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple Sağlık erişimi iste"
+            "value" : "Apple Health erişimi iste"
           }
         }
       }
