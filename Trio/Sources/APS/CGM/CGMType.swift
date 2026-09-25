@@ -18,7 +18,7 @@ enum CGMType: String, JSON, CaseIterable, Identifiable {
         case .xdrip:
             return "xDrip4iOS"
         case .appleHealth:
-            return "Apple Health"
+            return String(localized: "Apple Health", comment: "Apple Health CGM source name")
         case .simulator:
             return String(localized: "Glucose Simulator", comment: "Glucose Simulator CGM type")
         case .plugin:

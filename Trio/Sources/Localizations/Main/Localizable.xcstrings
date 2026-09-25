@@ -1089,6 +1089,138 @@
         }
       }
     },
+    "%lld min ago" : {
+      "comment" : "Apple Health CGM: age of the newest reading in minutes",
+      "localizations" : {
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld dk önce"
+          }
+        }
+      }
+    },
+    "Accept manually entered values (testing only)" : {
+      "comment" : "Apple Health CGM: testing toggle",
+      "localizations" : {
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elle girilen değerleri kabul et (yalnızca test)"
+          }
+        }
+      }
+    },
+    "Apple Health cannot be read while the iPhone is locked. Trio receives no new glucose and does not loop until you unlock it." : {
+      "comment" : "Apple Health CGM: permanent lock limitation warning",
+      "localizations" : {
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone kilitliyken Apple Sağlık okunamaz. Kilidi açana kadar Trio yeni glukoz almaz ve döngü çalışmaz."
+          }
+        }
+      }
+    },
+    "If you declined access earlier, allow it in Health › Profile › Apps › Trio." : {
+      "comment" : "Apple Health CGM: where to grant read access later",
+      "localizations" : {
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erişimi daha önce reddettiyseniz Sağlık › Profil › Uygulamalar › Trio bölümünden izin verin."
+          }
+        }
+      }
+    },
+    "Last reading" : {
+      "comment" : "Apple Health CGM: label for the newest stored reading",
+      "localizations" : {
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Son değer"
+          }
+        }
+      }
+    },
+    "No app has written blood glucose to Apple Health yet. Turn on Apple Health sharing in Instara first." : {
+      "comment" : "Apple Health CGM: no source apps found",
+      "localizations" : {
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Henüz hiçbir uygulama Apple Sağlık'a kan şekeri yazmadı. Önce Instara'da Apple Sağlık paylaşımını açın."
+          }
+        }
+      }
+    },
+    "No glucose from Apple Health for over 15 minutes. Check that Instara is sharing to Apple Health and that Trio may read it." : {
+      "comment" : "Apple Health CGM: no data warning",
+      "localizations" : {
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "15 dakikadır Apple Sağlık'tan glukoz gelmedi. Instara'nın Apple Sağlık'a paylaştığını ve Trio'nun okuma izni olduğunu kontrol edin."
+          }
+        }
+      }
+    },
+    "No reading yet" : {
+      "comment" : "Apple Health CGM: no reading stored yet",
+      "localizations" : {
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Henüz değer yok"
+          }
+        }
+      }
+    },
+    "Reads glucose that a CGM app such as Instara (Perlanova) writes to Apple Health" : {
+      "comment" : "Apple Health CGM source subtitle",
+      "localizations" : {
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instara (Perlanova) gibi bir CGM uygulamasının Apple Sağlık'a yazdığı glukozu okur"
+          }
+        }
+      }
+    },
+    "Request Apple Health access" : {
+      "comment" : "Apple Health CGM: button asking for read permission",
+      "localizations" : {
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Sağlık erişimi iste"
+          }
+        }
+      }
+    },
+    "Source app" : {
+      "comment" : "Apple Health CGM: picker for the app whose glucose is used",
+      "localizations" : {
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kaynak uygulama"
+          }
+        }
+      }
+    },
+    "TEST MODE: manually entered values are treated as CGM readings." : {
+      "comment" : "Apple Health CGM: shown while the testing toggle is on",
+      "localizations" : {
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TEST MODU: elle girilen değerler CGM ölçümü gibi kullanılıyor."
+          }
+        }
+      }
+    },
     " " : {
       "localizations" : {
         "bg" : {
@@ -50073,7 +50205,8 @@
             "value" : "Apple 健康"
           }
         }
-      }
+      },
+      "comment" : "Apple Health CGM source name"
     },
     "Apple Health Integration" : {
       "localizations" : {
