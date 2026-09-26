@@ -1,6 +1,7 @@
 import CGMBLEKit
 import Combine
 import G7SensorKit
+import HealthKit
 import LoopKitUI
 import SwiftUI
 
@@ -27,6 +28,12 @@ let cgmDefaultModel = CGMModel(
     subtitle: CGMType.none.subtitle
 )
 
+struct AppleHealthSourceOption: Identifiable, Hashable {
+    let bundleID: String
+    let name: String
+    var id: String { bundleID }
+}
+
 extension CGMSettings {
     final class StateModel: BaseStateModel<Provider> {
         // Singleton implementation
@@ -44,6 +51,8 @@ extension CGMSettings {
         @Injected() var broadcaster: Broadcaster!
         @Injected() var nightscoutManager: NightscoutManager!
         @Injected() var bluetoothManager: BluetoothStateManager!
+        @Injected() var healthKitStore: HKHealthStore!
+        @Injected() var glucoseStorage: GlucoseStorage!
 
         @Published var units: GlucoseUnits = .mgdL
         @Published var shouldDisplayCGMSetupSheet: Bool = false
@@ -52,8 +61,13 @@ extension CGMSettings {
         @Published var cgmTransmitterDeviceAddress: String? = nil
         @Published var listOfCGM: [CGMModel] = []
         @Published var url: URL?
+        @Published var appleHealthSourceBundleID: String?
+        @Published var appleHealthAcceptUserEntered = false
+        @Published var appleHealthSources: [AppleHealthSourceOption] = []
+        @Published var lastGlucoseDate: Date?
 
         var shouldRunDeleteOnSettingsChange = true
+        private var lastGlucoseDateCancellable: AnyCancellable?
 
         override func subscribe() {
             units = settingsManager.settings.units
@@ -95,6 +109,37 @@ extension CGMSettings {
             cgmTransmitterDeviceAddress = UserDefaults.standard.cgmTransmitterDeviceAddress
 
             subscribeSetting(\.smoothGlucose, on: $smoothGlucose, initial: { smoothGlucose = $0 })
+            subscribeSetting(
+                \.appleHealthCGMSourceBundleID,
+                on: $appleHealthSourceBundleID,
+                initial: { appleHealthSourceBundleID = $0 }
+            )
+            subscribeSetting(
+                \.appleHealthCGMAcceptUserEntered,
+                on: $appleHealthAcceptUserEntered,
+                initial: { appleHealthAcceptUserEntered = $0 }
+            )
+
+            lastGlucoseDate = glucoseStorage.lastGlucoseDate()
+            lastGlucoseDateCancellable = glucoseStorage.updatePublisher
+                .receive(on: DispatchQueue.global(qos: .utility))
+                .map { [weak self] _ in self?.glucoseStorage.lastGlucoseDate() }
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] date in self?.lastGlucoseDate = date }
+        }
+
+        /// Asks for read access (iOS shows the sheet only the first time) and reloads the apps that write glucose.
+        @MainActor func refreshAppleHealth() async {
+            do {
+                try await HealthKitGlucoseSource.requestReadAuthorization(healthKitStore)
+            } catch {
+                warning(.service, "Apple Health read authorization failed", error: error)
+            }
+            var seenBundleIDs = Set<String>()
+            appleHealthSources = await HealthKitGlucoseSource.glucoseSources(healthKitStore)
+                .map { AppleHealthSourceOption(bundleID: $0.bundleIdentifier, name: $0.name) }
+                .filter { seenBundleIDs.insert($0.bundleID).inserted }
+            lastGlucoseDate = glucoseStorage.lastGlucoseDate()
         }
 
         // this function will get called for all CGM types (plugin and non plugin)

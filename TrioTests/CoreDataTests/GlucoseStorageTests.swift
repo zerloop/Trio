@@ -7,6 +7,7 @@ import Testing
 
 @Suite("GlucoseStorage Tests", .serialized) struct GlucoseStorageTests: Injectable {
     @Injected() var storage: GlucoseStorage!
+    @Injected() var settingsManager: SettingsManager!
     let resolver: Resolver
     var coreDataStack: CoreDataStack!
     var testContext: NSManagedObjectContext!
@@ -26,7 +27,7 @@ import Testing
             UIAssembly(),
             SecurityAssembly(),
             TestAssembly(testContext: testContext) // Add our test assembly last to override Storage
-        ])
+        ], parent: nil, defaultObjectScope: .container)
 
         resolver = assembler.resolver
         injectServices(resolver)
@@ -286,7 +287,7 @@ import Testing
          let status = try await storage.getGlucoseStatus()
          #expect(status != nil, "Expected non‐nil status")
 
-         // “Now” glucose is the 0m reading
+         // "Now" glucose is the 0m reading
          #expect(status!.glucose == 100)
 
          // lastDelta: only the 5m point: (100–110)/5*5 = –10
@@ -301,4 +302,40 @@ import Testing
          // longAvgDelta: only the 30m window: (100–130)/30*5 = –5
          #expect(status!.longAvgDelta == -5)
      }*/
+
+    @Test("Apple Health CGM skips Health upload") func testAppleHealthReadingsSkipHealthUpload() async throws {
+        let previousCGM = settingsManager.settings.cgm
+        defer { settingsManager.settings.cgm = previousCGM }
+        settingsManager.settings.cgm = .appleHealth
+
+        try await storage.storeGlucose([BloodGlucose(direction: .flat, date: 1, dateString: Date(), glucose: 141)])
+
+        let stored = try await coreDataStack.fetchEntitiesAsync(
+            ofType: GlucoseStored.self,
+            onContext: testContext,
+            predicate: NSPredicate(format: "glucose == 141"),
+            key: "date",
+            ascending: false
+        ) as? [GlucoseStored]
+        #expect(stored?.first?.isUploadedToHealth == true)
+        let pending = try await storage.getGlucoseNotYetUploadedToHealth()
+        #expect(!pending.contains { $0.glucose == 141 })
+    }
+
+    @Test("Other sources queue for Health upload") func testOtherSourceReadingsQueueHealthUpload() async throws {
+        let previousCGM = settingsManager.settings.cgm
+        defer { settingsManager.settings.cgm = previousCGM }
+        settingsManager.settings.cgm = .xdrip
+
+        try await storage.storeGlucose([BloodGlucose(direction: .flat, date: 1, dateString: Date(), glucose: 142)])
+
+        let stored = try await coreDataStack.fetchEntitiesAsync(
+            ofType: GlucoseStored.self,
+            onContext: testContext,
+            predicate: NSPredicate(format: "glucose == 142"),
+            key: "date",
+            ascending: false
+        ) as? [GlucoseStored]
+        #expect(stored?.first?.isUploadedToHealth == false)
+    }
 }

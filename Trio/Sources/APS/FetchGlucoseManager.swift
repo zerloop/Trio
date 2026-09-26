@@ -45,6 +45,7 @@ final class BaseFetchGlucoseManager: FetchGlucoseManager, Injectable {
     @Injected() var pluginCGMManager: PluginManager!
     @Injected() var calibrationService: CalibrationService!
     @Injected() var trioAlertManager: TrioAlertManager!
+    @Injected() var healthKitStore: HKHealthStore!
 
     private var lifetime = Lifetime()
     private let timer = DispatchTimer(timeInterval: 1.minutes.timeInterval)
@@ -157,6 +158,8 @@ final class BaseFetchGlucoseManager: FetchGlucoseManager, Injectable {
 
     var glucoseSource: GlucoseSource? {
         didSet {
+            // The Apple Health source holds an observer query and background delivery; release them on swap.
+            (oldValue as? HealthKitGlucoseSource)?.stop()
             // Drop prior subscriptions so source swaps don't dupe emissions.
             cgmStatusSubscriptions.removeAll()
             cgmDisplayState.value = glucoseSource?.cgmDisplayState.value
@@ -241,6 +244,19 @@ final class BaseFetchGlucoseManager: FetchGlucoseManager, Injectable {
                 glucoseSource = nil
             case .xdrip:
                 glucoseSource = AppGroupSource(from: "xDrip", cgmType: .xdrip)
+            case .appleHealth:
+                let source = HealthKitGlucoseSource(
+                    healthStore: healthKitStore,
+                    settings: { [weak self] in
+                        HealthKitGlucoseSource.Settings(
+                            sourceBundleID: self?.settingsManager.settings.appleHealthCGMSourceBundleID,
+                            acceptUserEntered: self?.settingsManager.settings.appleHealthCGMAcceptUserEntered ?? false
+                        )
+                    },
+                    glucoseManager: self
+                )
+                source.start()
+                glucoseSource = source
             case .nightscout:
                 glucoseSource = nightscoutManager
             case .simulator:

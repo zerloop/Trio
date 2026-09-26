@@ -331,7 +331,8 @@ extension Home {
             // CGM RELATED
             .sheet(isPresented: $state.shouldDisplayCGMSetupSheet) {
                 switch state.cgmCurrent.type {
-                case .nightscout,
+                case .appleHealth,
+                     .nightscout,
                      .none,
                      .simulator,
                      .xdrip:

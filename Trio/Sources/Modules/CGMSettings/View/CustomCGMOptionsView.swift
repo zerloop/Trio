@@ -81,6 +81,8 @@ extension CGMSettings {
                             nightscoutSection
                         } else if cgmCurrent.type == .xdrip {
                             xDripConfigurationSection
+                        } else if cgmCurrent.type == .appleHealth {
+                            appleHealthConfigurationSection
                         } else if cgmCurrent.type == .simulator {
                             simulatorConfigurationSection
                         }
@@ -143,6 +145,9 @@ extension CGMSettings {
                 .onAppear {
                     if cgmCurrent.type == .simulator {
                         initializeSimulatorSettings()
+                    }
+                    if cgmCurrent.type == .appleHealth {
+                        Task { await state.refreshAppleHealth() }
                     }
                 }
             }
@@ -239,6 +244,87 @@ extension CGMSettings {
                     }
                 }
             ).listRowBackground(Color.chart)
+        }
+
+        /// No reading for this long means Instara is not sharing, or Trio may not read; iOS never reports read denial.
+        private static let appleHealthSilenceLimit: TimeInterval = 15 * 60
+
+        var appleHealthConfigurationSection: some View {
+            Group {
+                Section(
+                    header: Text("Configuration"),
+                    content: {
+                        if state.appleHealthSources.isEmpty {
+                            Text(
+                                "No app has written blood glucose to Apple Health yet. Turn on Apple Health sharing in Instara first."
+                            )
+                            .font(.footnote)
+                            .foregroundStyle(Color.secondary)
+                        } else {
+                            Picker("Source app", selection: $state.appleHealthSourceBundleID) {
+                                Text("None").tag(String?.none)
+                                ForEach(state.appleHealthSources) { option in
+                                    Text(option.name).tag(Optional(option.bundleID))
+                                }
+                            }
+                        }
+
+                        TimelineView(.periodic(from: .now, by: 60)) { context in
+                            appleHealthLastReadingRow(now: context.date)
+                        }
+
+                        Button("Request Apple Health access") {
+                            Task { await state.refreshAppleHealth() }
+                        }
+                        Text("If you declined access earlier, allow it in Health › Profile › Apps › Trio.")
+                            .font(.footnote)
+                            .foregroundStyle(Color.secondary)
+                    }
+                ).listRowBackground(Color.chart)
+
+                Section {
+                    Label(
+                        "Apple Health cannot be read while the iPhone is locked. Trio receives no new glucose and does not loop until you unlock it.",
+                        systemImage: "lock.iphone"
+                    )
+                    .font(.footnote)
+                }.listRowBackground(Color.chart)
+
+                Section {
+                    Toggle("Accept manually entered values (testing only)", isOn: $state.appleHealthAcceptUserEntered)
+                    if state.appleHealthAcceptUserEntered {
+                        Text("TEST MODE: manually entered values are treated as CGM readings.")
+                            .font(.footnote)
+                            .bold()
+                            .foregroundStyle(Color.red)
+                    }
+                }.listRowBackground(Color.chart)
+            }
+        }
+
+        @ViewBuilder private func appleHealthLastReadingRow(now: Date) -> some View {
+            if let date = state.lastGlucoseDate {
+                let minutes = Int(now.timeIntervalSince(date) / 60)
+                HStack {
+                    Text("Last reading")
+                    Spacer()
+                    Text(date, style: .time)
+                    Text("\(minutes) min ago").foregroundStyle(Color.secondary)
+                }
+                if now.timeIntervalSince(date) > Self.appleHealthSilenceLimit {
+                    Text(
+                        "No glucose from Apple Health for over 15 minutes. Check that Instara is sharing to Apple Health and that Trio may read it."
+                    )
+                    .font(.footnote)
+                    .foregroundStyle(Color.orange)
+                }
+            } else {
+                HStack {
+                    Text("Last reading")
+                    Spacer()
+                    Text("No reading yet").foregroundStyle(Color.secondary)
+                }
+            }
         }
 
         var simulatorConfigurationSection: some View {
