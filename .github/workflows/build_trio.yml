@@ -142,7 +142,8 @@ jobs:
         run: |
           DAY_OF_MONTH=$(date +%-d)
           WEEK_OF_MONTH=$(( ($(date +%-d) - 1) / 7 + 1 ))
-          if [[ $WEEK_OF_MONTH -eq 2 ]]; then
+          # GlucoEcoSystem: zorunlu derleme iki ayda bir (tek ayların 2. pazarı); yeni sürüm varsa her hafta derlenir
+          if [[ $WEEK_OF_MONTH -eq 2 && $(( $(date +%-m) % 2 )) -eq 1 ]]; then
             echo "is_second_instance=true" >> "$GITHUB_OUTPUT"
           else
             echo "is_second_instance=false" >> "$GITHUB_OUTPUT"
