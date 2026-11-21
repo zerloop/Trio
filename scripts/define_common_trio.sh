@@ -12,23 +12,26 @@
 # define the TRIO_PROJECTS used by Trio where for Trio the .gitmodules points
 #   to the downstream fork of loopandlearn in all cases
 #
-# The only submodule that needs a special trio branch (at this time) is LoopKit
-#    put that repository first in the list
+# LoopKit needs its trio branch, and LibreLoop its legacy-loopkit-compat branch,
+#   which builds against that LoopKit
 #
-# The scrips in LoopWorkspace are used to update translations and make
+# There are scripts available in LoopWorkspace that update translations and make
 #   sure the loopandlearn branches are up to date
-# Even though EversenseKit is only found in a feature branch
-#   it does no harm to update extra repositories using this script
 TRIO_PROJECTS=( \
-    loopandlearn:LoopKit:trio \
+    loopandlearn:AccuChekKit:master \
     loopandlearn:CGMBLEKit:dev \
-    loopandlearn:dexcom-share-client-swift:dev \
-    loopandlearn:G7SensorKit:main \
-    loopandlearn:LibreTransmitter:main \
-    loopandlearn:MinimedKit:main \
-    loopandlearn:RileyLinkKit:dev \
-    loopandlearn:TidepoolService:dev \
     loopandlearn:DanaKit:dev \
-    loopandlearn:MedtrumKit:dev \
+    loopandlearn:dexcom-share-client-swift:dev \
     loopandlearn:EversenseKit:dev \
+    loopandlearn:G7SensorKit:main \
+    loopandlearn:LibreLoop:legacy-loopkit-compat \
+    loopandlearn:LibreTransmitter:main \
+    loopandlearn:LoopKit:trio \
+    loopandlearn:MedtrumKit:dev \
+    loopandlearn:MinimedKit:main \
+    loopandlearn:OmnipodKit:dev \
+    loopandlearn:RileyLinkKit:dev \
+    loopandlearn:RoundWhiteDiscKit:main \
+    loopandlearn:TidepoolService:dev \
+    loopandlearn:LoopAlgorithm:main \
 )

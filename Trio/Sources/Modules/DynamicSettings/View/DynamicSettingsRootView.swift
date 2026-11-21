@@ -102,6 +102,8 @@ extension DynamicSettings {
                                     .font(.footnote)
                                     .foregroundColor(miniHintTextColor)
                                     .lineLimit(nil)
+                                    .multilineTextAlignment(.leading)
+                                    .fixedSize(horizontal: false, vertical: true)
 
                                 Spacer()
                                 Button(
@@ -158,7 +160,7 @@ extension DynamicSettings {
                                     },
                                     label: {
                                         HStack {
-                                            Image(systemName: "questionmark.circle")
+                                            Image(systemName: "questionmark.circle").accessibilityLabel(Text("More information"))
                                         }
                                     }
                                 ).buttonStyle(BorderlessButtonStyle())

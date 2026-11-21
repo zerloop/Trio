@@ -96,7 +96,7 @@ extension NightscoutAPI {
             let glucose = try JSONCoding.decoder.decode([BloodGlucose].self, from: data)
             return glucose.map {
                 var reading = $0
-                reading.glucose = $0.sgv
+                reading.glucose = $0.sgv ?? $0.mbg
                 return reading
             }
         } catch {
@@ -449,7 +449,8 @@ extension NightscoutAPI {
         components.port = url.port
         components.path = Config.treatmentsPath
         components.queryItems = [
-            URLQueryItem(name: "find[created_at][$eq]", value: createdAt)
+            URLQueryItem(name: "find[created_at][$eq]", value: createdAt),
+            URLQueryItem(name: "find[eventType][$eq]", value: OverrideStored.EventType.nsExercise.rawValue)
         ]
 
         guard let url = components.url else {

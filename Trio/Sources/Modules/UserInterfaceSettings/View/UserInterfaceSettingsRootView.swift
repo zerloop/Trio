@@ -61,6 +61,8 @@ extension UserInterfaceSettings {
                                 .font(.footnote)
                                 .foregroundColor(.secondary)
                                 .lineLimit(nil)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
                                 Spacer()
                                 Button(
                                     action: {
@@ -89,7 +91,7 @@ extension UserInterfaceSettings {
                                     },
                                     label: {
                                         HStack {
-                                            Image(systemName: "questionmark.circle")
+                                            Image(systemName: "questionmark.circle").accessibilityLabel(Text("More information"))
                                         }
                                     }
                                 ).buttonStyle(BorderlessButtonStyle())
@@ -116,6 +118,8 @@ extension UserInterfaceSettings {
                             .font(.footnote)
                             .foregroundColor(.secondary)
                             .lineLimit(nil)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
                             Spacer()
                             Button(
                                 action: {
@@ -155,7 +159,7 @@ extension UserInterfaceSettings {
                                 },
                                 label: {
                                     HStack {
-                                        Image(systemName: "questionmark.circle")
+                                        Image(systemName: "questionmark.circle").accessibilityLabel(Text("More information"))
                                     }
                                 }
                             ).buttonStyle(BorderlessButtonStyle())
@@ -168,7 +172,7 @@ extension UserInterfaceSettings {
                     content: {
                         VStack {
                             Toggle("Show X-Axis Grid Lines", isOn: $state.xGridLines)
-                            Toggle("Show Y-Axis Grid Lines", isOn: $state.yGridLines)
+                            Toggle("Show Y-Axis Grid Lines", isOn: $state.yGridLines).padding(.top)
 
                             HStack(alignment: .center) {
                                 Text(
@@ -177,6 +181,8 @@ extension UserInterfaceSettings {
                                 .font(.footnote)
                                 .foregroundColor(.secondary)
                                 .lineLimit(nil)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
                                 Spacer()
                                 Button(
                                     action: {
@@ -189,7 +195,7 @@ extension UserInterfaceSettings {
                                     },
                                     label: {
                                         HStack {
-                                            Image(systemName: "questionmark.circle")
+                                            Image(systemName: "questionmark.circle").accessibilityLabel(Text("More information"))
                                         }
                                     }
                                 ).buttonStyle(BorderlessButtonStyle())
@@ -235,9 +241,26 @@ extension UserInterfaceSettings {
                                         Text(state.units == .mgdL ? " mg/dL" : " mmol/L").foregroundColor(.secondary)
                                     }
                                 }
+                                .contentShape(Rectangle())
                                 .onTapGesture {
                                     displayPickerLowThreshold.toggle()
                                 }
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel(Text("Low Threshold"))
+                                .accessibilityValue(Text(
+                                    (state.units == .mgdL ? state.low.description : state.low.asMmolL.description)
+                                        + " " + state.units.spokenValue
+                                ))
+                                .accessibilityHint(Text(
+                                    displayPickerLowThreshold
+                                        ? String(localized: "Closes the value picker", comment: "Accessibility hint")
+                                        : String(
+                                            localized: "Opens a picker to change this value",
+                                            comment: "Accessibility hint"
+                                        )
+                                ))
+                                .accessibilityAddTraits(.isButton)
+                                .accessibilityAction { displayPickerLowThreshold.toggle() }
                             }
                             .padding(.top)
 
@@ -270,9 +293,26 @@ extension UserInterfaceSettings {
                                         Text(state.units == .mgdL ? " mg/dL" : " mmol/L").foregroundColor(.secondary)
                                     }
                                 }
+                                .contentShape(Rectangle())
                                 .onTapGesture {
                                     displayPickerHighThreshold.toggle()
                                 }
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel(Text("High Threshold"))
+                                .accessibilityValue(Text(
+                                    (state.units == .mgdL ? state.high.description : state.high.asMmolL.description)
+                                        + " " + state.units.spokenValue
+                                ))
+                                .accessibilityHint(Text(
+                                    displayPickerHighThreshold
+                                        ? String(localized: "Closes the value picker", comment: "Accessibility hint")
+                                        : String(
+                                            localized: "Opens a picker to change this value",
+                                            comment: "Accessibility hint"
+                                        )
+                                ))
+                                .accessibilityAddTraits(.isButton)
+                                .accessibilityAction { displayPickerHighThreshold.toggle() }
                             }
                             .padding(.top)
 
@@ -296,6 +336,8 @@ extension UserInterfaceSettings {
                                     "Set low and high glucose values for the main screen, watch app, live activity, and contact image colors."
                                 )
                                 .lineLimit(nil)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
                                 .font(.footnote)
                                 .foregroundColor(.secondary)
 
@@ -323,7 +365,7 @@ extension UserInterfaceSettings {
                                     },
                                     label: {
                                         HStack {
-                                            Image(systemName: "questionmark.circle")
+                                            Image(systemName: "questionmark.circle").accessibilityLabel(Text("More information"))
                                         }
                                     }
                                 ).buttonStyle(BorderlessButtonStyle())
@@ -350,6 +392,8 @@ extension UserInterfaceSettings {
                             .font(.footnote)
                             .foregroundColor(.secondary)
                             .lineLimit(nil)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
                             Spacer()
                             Button(
                                 action: {
@@ -378,7 +422,7 @@ extension UserInterfaceSettings {
                                 },
                                 label: {
                                     HStack {
-                                        Image(systemName: "questionmark.circle")
+                                        Image(systemName: "questionmark.circle").accessibilityLabel(Text("More information"))
                                     }
                                 }
                             ).buttonStyle(BorderlessButtonStyle())
@@ -404,6 +448,8 @@ extension UserInterfaceSettings {
                             .font(.footnote)
                             .foregroundColor(.secondary)
                             .lineLimit(nil)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
                             Spacer()
                             Button(
                                 action: {
@@ -420,7 +466,7 @@ extension UserInterfaceSettings {
                                 },
                                 label: {
                                     HStack {
-                                        Image(systemName: "questionmark.circle")
+                                        Image(systemName: "questionmark.circle").accessibilityLabel(Text("More information"))
                                     }
                                 }
                             ).buttonStyle(BorderlessButtonStyle())
@@ -448,6 +494,8 @@ extension UserInterfaceSettings {
                                 .font(.footnote)
                                 .foregroundColor(.secondary)
                                 .lineLimit(nil)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
                                 Spacer()
                                 Button(
                                     action: {
@@ -462,7 +510,7 @@ extension UserInterfaceSettings {
                                     },
                                     label: {
                                         HStack {
-                                            Image(systemName: "questionmark.circle")
+                                            Image(systemName: "questionmark.circle").accessibilityLabel(Text("More information"))
                                         }
                                     }
                                 ).buttonStyle(BorderlessButtonStyle())
@@ -489,6 +537,8 @@ extension UserInterfaceSettings {
                             .font(.footnote)
                             .foregroundColor(.secondary)
                             .lineLimit(nil)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
                             Spacer()
                             Button(
                                 action: {
@@ -542,7 +592,7 @@ extension UserInterfaceSettings {
                                 },
                                 label: {
                                     HStack {
-                                        Image(systemName: "questionmark.circle")
+                                        Image(systemName: "questionmark.circle").accessibilityLabel(Text("More information"))
                                     }
                                 }
                             ).buttonStyle(BorderlessButtonStyle())
@@ -568,6 +618,8 @@ extension UserInterfaceSettings {
                             .font(.footnote)
                             .foregroundColor(.secondary)
                             .lineLimit(nil)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
                             Spacer()
                             Button(
                                 action: {
@@ -575,14 +627,14 @@ extension UserInterfaceSettings {
                                     selectedVerboseHint =
                                         AnyView(
                                             Text(
-                                                "Choose what the statistics panel on the home screen shows by default. Tapping the panel always opens the full statistics view.\n\nTime in Range: today's time in range percentage with a glucose distribution bar.\n\nDistribution Bar Only: just the glucose distribution bar, without the percentage.\n\nToday's Averages: today's average glucose and GMI (Glucose Management Index)."
+                                                "Choose what the statistics panel on the home screen shows by default. Tapping the panel always opens the full statistics view.\n\nTime in Range: today's time in range percentage with a glucose distribution bar.\n\nDistribution Bar Only: just the glucose distribution bar, without the percentage.\n\nToday's Averages: today's average glucose and GMI (Glucose Management Index).\n\nHide Statistics: shows no data at all, just a \"View Statistics\" shortcut."
                                             )
                                         )
                                     shouldDisplayHint.toggle()
                                 },
                                 label: {
                                     HStack {
-                                        Image(systemName: "questionmark.circle")
+                                        Image(systemName: "questionmark.circle").accessibilityLabel(Text("More information"))
                                     }
                                 }
                             ).buttonStyle(BorderlessButtonStyle())

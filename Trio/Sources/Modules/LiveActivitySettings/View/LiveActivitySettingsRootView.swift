@@ -126,6 +126,8 @@ extension LiveActivitySettings {
                                     .font(.footnote)
                                     .foregroundColor(.secondary)
                                     .lineLimit(nil)
+                                    .multilineTextAlignment(.leading)
+                                    .fixedSize(horizontal: false, vertical: true)
                                     Spacer()
                                     Button(
                                         action: {
@@ -159,6 +161,7 @@ extension LiveActivitySettings {
                                         label: {
                                             HStack {
                                                 Image(systemName: "questionmark.circle")
+                                                    .accessibilityLabel(Text("More information"))
                                             }
                                         }
                                     ).buttonStyle(BorderlessButtonStyle())
@@ -196,6 +199,8 @@ extension LiveActivitySettings {
                                     .font(.footnote)
                                     .foregroundColor(.secondary)
                                     .lineLimit(nil)
+                                    .multilineTextAlignment(.leading)
+                                    .fixedSize(horizontal: false, vertical: true)
                                     Spacer()
                                     Button(
                                         action: {
@@ -223,6 +228,7 @@ extension LiveActivitySettings {
                                         label: {
                                             HStack {
                                                 Image(systemName: "questionmark.circle")
+                                                    .accessibilityLabel(Text("More information"))
                                             }
                                         }
                                     ).buttonStyle(BorderlessButtonStyle())

@@ -15,7 +15,9 @@ extension Adjustments.RootView {
 
     var overridePresets: some View {
         Section {
-            ForEach(state.overridePresets) { preset in
+            // objectID instead of the optional `id` field, which can be nil/duplicated and
+            // crashes SwiftUI's ForEach.
+            ForEach(state.overridePresets, id: \.objectID) { preset in
                 overridesView(for: preset, showCheckMark: showOverrideCheckmark) {
                     requestOverridePresetActivation(preset)
                 }
@@ -39,34 +41,33 @@ extension Adjustments.RootView {
     }
 
     func overrideDeleteConfirmation(_ content: some View) -> some View {
-        content.confirmationDialog(
-            "Delete the Override Preset \"\(overrideToDelete?.name ?? "")\"?",
+        let target = overrideToDelete
+        let isRunning = target != nil && state.currentActiveOverride == target
+
+        return content.glassActionSheet(
+            "Delete the Override Preset \"\(target?.name ?? "")\"?",
+            message: isRunning ? Text("This override preset is currently running. Deleting will stop it.") : nil,
             isPresented: Binding(
                 get: { overrideToDelete != nil },
                 set: { if !$0 { overrideToDelete = nil } }
             ),
-            titleVisibility: .visible,
-            presenting: overrideToDelete
-        ) { target in
-            Button(
-                state.currentActiveOverride == target ? "Stop and Delete" : "Delete",
-                role: .destructive
-            ) {
-                if state.currentActiveOverride == target {
+            actions: [
+                GlassSheetAction(
+                    isRunning ? "Stop and Delete" : "Delete",
+                    role: .destructive
+                ) {
+                    guard let target else { return }
+                    if isRunning {
+                        Task {
+                            await state.disableAllActiveOverrides(createOverrideRunEntry: true)
+                        }
+                    }
                     Task {
-                        await state.disableAllActiveOverrides(createOverrideRunEntry: true)
+                        await state.invokeOverridePresetDeletion(target.objectID)
                     }
                 }
-                Task {
-                    await state.invokeOverridePresetDeletion(target.objectID)
-                }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: { target in
-            if state.currentActiveOverride == target {
-                Text("This override preset is currently running. Deleting will stop it.")
-            }
-        }
+            ]
+        )
     }
 
     private func requestOverridePresetActivation(_ preset: OverrideStored) {
@@ -152,7 +153,14 @@ extension Adjustments.RootView {
 
         let targetString = target.isEmpty ? "" : "\(target) \(state.units.rawValue)"
 
-        let durationString = indefinite ? "" : "\(state.formatHoursAndMinutes(Int(duration)))"
+        // Int(_: Decimal) traps on NaN/out-of-range values, so a corrupted preset would crash
+        // this screen on every open. Guard via Double instead.
+        let durationString: String = {
+            guard !indefinite else { return "" }
+            let durationMinutes = NSDecimalNumber(decimal: duration).doubleValue
+            guard durationMinutes.isFinite, durationMinutes.magnitude <= Double(Int.max) else { return "" }
+            return state.formatHoursAndMinutes(Int(durationMinutes))
+        }()
 
         let scheduledSMBString: String = {
             guard preset.smbIsScheduledOff, preset.start != preset.end else { return "" }
@@ -190,7 +198,12 @@ extension Adjustments.RootView {
             }
         }()
 
-        let percentageString = percentage != 100 ? "\(Int(percentage))%\(isfAndCrString)" : ""
+        // Same trap risk as duration above.
+        let percentageString: String = {
+            guard percentage != 100 else { return "" }
+            guard percentage.isFinite, percentage.magnitude <= Double(Int.max) else { return "" }
+            return "\(Int(percentage))%\(isfAndCrString)"
+        }()
 
         // Combine all labels into a single array, filtering out empty strings
         let labels: [String] = [
@@ -240,6 +253,12 @@ extension Adjustments.RootView {
                         .foregroundStyle(.secondary)
                 }
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(name))
+            .accessibilityValue(Text(labels.joined(separator: ", ")))
+            .accessibilityHint(Text(String(localized: "Double tap to enable this override", comment: "Accessibility hint")))
+            .accessibilityAddTraits(showOverrideCheckmark && isSelected ? [.isButton, .isSelected] : .isButton)
+            .accessibilityAction { onTap?() }
         }
     }
 }

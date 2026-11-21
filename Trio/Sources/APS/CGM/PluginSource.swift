@@ -1,5 +1,7 @@
+import AccuChekKit
 import CGMBLEKit
 import Combine
+import EversenseKit
 import Foundation
 import G7SensorKit
 import LibreLoop
@@ -168,6 +170,8 @@ extension PluginSource: CGMManagerDelegate {
                 debug(.deviceManager, "CGM PLUGIN - unable to read CGM result")
             }
 
+            self.glucoseManager?.reportCGMSensorObservation(self.currentSensorObservation())
+
             self.publishCGMStatus()
 
             debug(.deviceManager, "CGM PLUGIN - Direct return done")
@@ -187,6 +191,7 @@ extension PluginSource: CGMManagerDelegate {
 
                 if event.type == .sensorStart {
                     self.glucoseManager?.removeCalibrations()
+                    self.glucoseManager?.startCGMSensorSession(startedAt: event.date)
                 }
             }
         }
@@ -242,6 +247,16 @@ extension PluginSource: CGMManagerDelegate {
         }
     }
 
+    // The live reading carries the sensor state; a backfill's .newData says nothing about it.
+    private func currentSensorObservation() -> CGMSensorObservation {
+        if let cgmTransmitterManager = cgmManager as? G7CGMManager {
+            return cgmTransmitterManager.latestReading?.algorithmState.observation ?? .unavailable
+        } else if let cgmTransmitterManager = cgmManager as? G6CGMManager {
+            return cgmTransmitterManager.latestReading?.state.observation ?? .unavailable
+        }
+        return .unavailable
+    }
+
     private func readCGMResult(readingResult: CGMReadingResult) -> Result<[BloodGlucose], Error> {
         debug(.deviceManager, "PLUGIN CGM - Process CGM Reading Result launched with \(readingResult)")
 
@@ -283,26 +298,47 @@ extension PluginSource: CGMManagerDelegate {
                 sensorActivatedAt = cgmTransmitterManager.state.activatedAt
                 sensorStartDate = cgmTransmitterManager.state.activatedAt
                 sensorTransmitterID = cgmTransmitterManager.state.sensorSerial
+            } else if let cgmTransmitterManager = cgmManager as? AccuChekCgmManager {
+                sensorActivatedAt = cgmTransmitterManager.state.cgmStartTime
+                sensorStartDate = cgmTransmitterManager.state.cgmStartTime
+                sensorTransmitterID = cgmTransmitterManager.state.sensorInfo?.serialNumber
+            } else if let cgmTransmitterManager = cgmManager as? EversenseCGMManager {
+                sensorActivatedAt = cgmTransmitterManager.state.activatedAt
+                sensorStartDate = cgmTransmitterManager.state.activatedAt
+                sensorTransmitterID = cgmTransmitterManager.state.bleNameString
             }
 
-            // Libre 3/3+ only: the sensor flags readings it considers advisory.
-            // Trio doses on everything it stores, so drop them rather than treat
-            // them as clean. Other CGMs use isDisplayOnly differently (Dexcom
-            // sets it during calibration), so this stays plugin-scoped.
-            let dropsDisplayOnlyReadings = cgmManager is LibreLoopCGMManager
-
+            // isDisplayOnly means "shifted for visual consistency after calibration"
+            // (LoopKit), not "unsafe to dose"; drivers withhold sensor-reported faults.
             let bloodGlucose = values.compactMap { newGlucoseSample -> BloodGlucose? in
-                if dropsDisplayOnlyReadings, newGlucoseSample.isDisplayOnly {
+                if newGlucoseSample.isDisplayOnly {
                     debug(
                         .deviceManager,
-                        "PLUGIN CGM - dropping display-only reading at \(newGlucoseSample.date)"
+                        "PLUGIN CGM - display-only reading at \(newGlucoseSample.date), storing it"
                     )
-                    return nil
                 }
 
                 let quantity = newGlucoseSample.quantity
 
                 let value = Int(quantity.doubleValue(for: .milligramsPerDeciliter))
+
+                if newGlucoseSample.wasUserEntered {
+                    // Store the calibration for the sensor as manual glucose
+                    return BloodGlucose(
+                        id: UUID().uuidString,
+                        mbg: value,
+                        date: Decimal(Int(newGlucoseSample.date.timeIntervalSince1970 * 1000)),
+                        dateString: newGlucoseSample.date,
+                        filtered: nil,
+                        noise: nil,
+                        glucose: value,
+                        type: "mbg",
+                        activationDate: sensorActivatedAt,
+                        sessionStartDate: sensorStartDate,
+                        transmitterID: sensorTransmitterID
+                    )
+                }
+
                 return BloodGlucose(
                     id: UUID().uuidString,
                     sgv: value,

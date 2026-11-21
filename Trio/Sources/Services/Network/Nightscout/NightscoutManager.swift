@@ -17,7 +17,7 @@ protocol NightscoutManager: GlucoseSource {
     func uploadOverrides() async
     func uploadTempTargets() async
     func uploadProfiles() async throws
-    func uploadNoteTreatment(note: String) async
+    @discardableResult func uploadNoteTreatment(note: String) async -> Bool
     func importSettings() async -> ScheduledNightscoutProfile?
     var cgmURL: URL? { get }
 }
@@ -654,9 +654,10 @@ final class BaseNightscoutManager: NightscoutManager, Injectable {
         let openapsStatus = OpenAPSStatus(
             iob: iob?.first,
             suggested: suggestedToUpload,
-            enacted: settingsManager.settings.closedLoop ? enactedToUpload : nil,
+            enacted: settingsManager.settings.dosingMode.automation != .off ? enactedToUpload : nil,
             version: Bundle.main.releaseVersionNumber ?? "Unknown",
-            recommendedBolus: recommendedBolus
+            recommendedBolus: recommendedBolus,
+            dosingMode: settingsManager.settings.dosingMode.rawValue
         )
 
         debug(.nightscout, "To be uploaded openapsStatus: \(openapsStatus)")
@@ -1006,9 +1007,10 @@ final class BaseNightscoutManager: NightscoutManager, Injectable {
         }
     }
 
-    private func uploadNonCoreDataTreatments(_ treatments: [NightscoutTreatment]) async {
+    /// - Returns: `true` only if every chunk reached Nightscout.
+    @discardableResult private func uploadNonCoreDataTreatments(_ treatments: [NightscoutTreatment]) async -> Bool {
         guard !treatments.isEmpty, let nightscout = nightscoutAPI, isUploadEnabled else {
-            return
+            return false
         }
 
         do {
@@ -1017,8 +1019,10 @@ final class BaseNightscoutManager: NightscoutManager, Injectable {
             }
 
             debug(.nightscout, "Treatments uploaded")
+            return true
         } catch {
             debug(.nightscout, String(describing: error))
+            return false
         }
     }
 
@@ -1045,12 +1049,24 @@ final class BaseNightscoutManager: NightscoutManager, Injectable {
         context.name = "updatePumpEventStoredsAsUploaded"
         await context.perform {
             let ids = treatments.map(\.id) as NSArray
+            let treatmentsById = Dictionary(
+                treatments.compactMap { treatment in treatment.id.map { ($0, treatment) } },
+                uniquingKeysWith: { first, _ in first }
+            )
             let fetchRequest: NSFetchRequest<PumpEventStored> = PumpEventStored.fetchRequest()
             fetchRequest.predicate = NSPredicate(format: "id IN %@", ids)
 
             do {
                 let results = try context.fetch(fetchRequest)
                 for result in results {
+                    // stamp only if the row still holds what was sent; a mid-flight
+                    // finalization keeps the flag false and the next pass re-uploads
+                    guard let treatment = result.id.flatMap({ treatmentsById[$0] }),
+                          Self.uploadStillCurrent(result, treatment)
+                    else {
+                        debug(.nightscout, "Pump event \(result.id ?? "-") changed during upload, keeping it queued")
+                        continue
+                    }
                     result.isUploadedToNS = true
                 }
 
@@ -1061,6 +1077,19 @@ final class BaseNightscoutManager: NightscoutManager, Injectable {
                     "\(DebuggingIdentifiers.failed) \(#file) \(#function) Failed to update isUploadedToNS: \(error.userInfo)"
                 )
             }
+        }
+    }
+
+    /// True when the stored row still matches the values that were sent to NS.
+    static func uploadStillCurrent(_ event: PumpEventStored, _ treatment: NightscoutTreatment) -> Bool {
+        switch event.type {
+        case PumpEventStored.EventType.bolus.rawValue:
+            return treatment.insulin == event.bolus?.amount as Decimal?
+        case PumpEventStored.EventType.tempBasal.rawValue:
+            return treatment.rate == event.tempBasal?.rate as Decimal?
+                && treatment.duration == Int(event.tempBasal?.duration ?? 0)
+        default:
+            return true
         }
     }
 
@@ -1180,13 +1209,11 @@ final class BaseNightscoutManager: NightscoutManager, Injectable {
                     continue
                 }
 
-                /// Check for an existing stored override and delete if needed
-                /// This is neccessary when a running override is cancelled, or replaced with a new override, before its duration is over.
-                try await overridesStorage.checkIfShouldDeleteNightscoutOverrideEntry(
-                    forCreatedAt: createdAtString,
-                    newDuration: overrideRun.duration,
-                    using: nightscout
-                )
+                /// The entry Nightscout holds for this activation carries the placeholder duration
+                /// uploaded when the override started, under the same `created_at` the run derives
+                /// from its `startDate`. Nightscout re-renders a duration change only when the entry
+                /// is replaced, so the entry is deleted and the run re-posted in its place.
+                try await nightscout.deleteNightscoutOverride(withCreatedAt: createdAtString)
 
                 processedOverrideRuns.append(overrideRun)
             }
@@ -1315,7 +1342,7 @@ final class BaseNightscoutManager: NightscoutManager, Injectable {
     }
 
     // TODO: have this checked; this has never actually written anything to file; the entire logic of this function seems broken
-    func uploadNoteTreatment(note: String) async {
+    @discardableResult func uploadNoteTreatment(note: String) async -> Bool {
         let uploadedNotes = storage.retrieve(OpenAPS.Nightscout.uploadedNotes, as: [NightscoutTreatment].self) ?? []
         let now = Date()
 
@@ -1328,10 +1355,11 @@ final class BaseNightscoutManager: NightscoutManager, Injectable {
                 targetTop: nil,
                 targetBottom: nil
             )
-            await uploadNonCoreDataTreatments([noteTreatment])
+            return await uploadNonCoreDataTreatments([noteTreatment])
             // TODO: fix/adjust, if necessary
 //            await uploadTreatments([noteTreatment], fileToSave: OpenAPS.Nightscout.uploadedNotes)
         }
+        return false
     }
 }
 

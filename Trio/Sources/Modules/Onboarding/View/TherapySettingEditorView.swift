@@ -60,7 +60,7 @@ struct TherapySettingEditorView: View {
                 .padding(.bottom, -10)
 
                 List {
-                    ForEach($items) { $item in
+                    ForEach(items) { item in
                         VStack(spacing: 0) {
                             Button {
                                 selectedItemID = selectedItemID == item.id ? nil : item.id
@@ -92,10 +92,18 @@ struct TherapySettingEditorView: View {
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel(Text(entryAccessibilityLabel(for: item, unit: unit)))
+                            .accessibilityHint(Text(
+                                "Opens a picker to edit this entry",
+                                comment: "Accessibility hint for a schedule entry"
+                            ))
+                            .accessibilityAction(named: Text("Delete")) {
+                                deleteItem(with: item.id)
+                            }
 
-                            if selectedItemID == item.id {
+                            if selectedItemID == item.id, let itemBinding = binding(for: item.id) {
                                 timeValuePickerRow(
-                                    item: $item,
+                                    item: itemBinding,
                                     timeOptions: timeOptions,
                                     valueOptions: valueOptions,
                                     unit: unit
@@ -104,11 +112,9 @@ struct TherapySettingEditorView: View {
                             }
                         }
                         .contextMenu {
-                            if let index = items.firstIndex(where: { $0.id == item.id }), items.count > 1 {
+                            if items.count > 1 {
                                 Button(role: .destructive) {
-                                    items.remove(at: index)
-                                    selectedItemID = nil
-                                    validateTherapySettingItems()
+                                    deleteItem(with: item.id)
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
@@ -116,11 +122,9 @@ struct TherapySettingEditorView: View {
                             }
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            if let index = items.firstIndex(where: { $0.id == item.id }), items.count > 1 {
+                            if items.count > 1 {
                                 Button(role: .destructive) {
-                                    items.remove(at: index)
-                                    selectedItemID = nil
-                                    validateTherapySettingItems()
+                                    deleteItem(with: item.id)
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
@@ -165,6 +169,27 @@ struct TherapySettingEditorView: View {
                 })
             }
         }
+    }
+
+    /// Binding to the entry with `id`, resolved on every access so a removed entry cannot trap on a stale index.
+    private func binding(for id: UUID) -> Binding<TherapySettingItem>? {
+        guard items.contains(where: { $0.id == id }) else { return nil }
+
+        return Binding(
+            get: { items.first(where: { $0.id == id }) ?? TherapySettingItem(time: 0, value: 0) },
+            set: { newItem in
+                guard let index = items.firstIndex(where: { $0.id == id }) else { return }
+                items[index] = newItem
+            }
+        )
+    }
+
+    /// Removes the entry with `id`, resolving its index at call time; the last remaining entry is kept.
+    private func deleteItem(with id: UUID) {
+        guard items.count > 1, let index = items.firstIndex(where: { $0.id == id }) else { return }
+        items.remove(at: index)
+        selectedItemID = nil
+        validateTherapySettingItems()
     }
 
     @ViewBuilder private func timeValuePickerRow(
@@ -263,12 +288,12 @@ struct TherapySettingEditorView: View {
             newItems[0] = first
         }
 
-        // force ALL items to have new UUIDs (to enforce binding update)
-        items = newItems.map { TherapySettingItem(copying: $0, newID: true) }
+        // keep IDs stable so in-flight row actions cannot reference a removed entry
+        items = newItems
 
-        // Restore selection by finding the item with the same time value
-        if let selectedTime = selectedTime {
-            selectedItemID = items.first(where: { $0.time == selectedTime })?.id
+        // Restore selection by time value, if the selected item is gone
+        if !items.contains(where: { $0.id == selectedItemID }) {
+            selectedItemID = selectedTime.flatMap { time in items.first(where: { $0.time == time })?.id }
         }
 
         // validates underlying "raw" therapy setting (i.e. item of type basal, target, isf, carb ratio)
@@ -294,6 +319,13 @@ struct TherapySettingEditorView: View {
              .mgdLPerUnit:
             return decimalValue.description
         }
+    }
+
+    /// One spoken string per schedule entry, e.g. "1.2 U/hr, starts at 6:00 AM".
+    private func entryAccessibilityLabel(for item: TherapySettingItem, unit: TherapySettingUnit) -> String {
+        let timeString = timeFormatter.string(from: Date(timeIntervalSince1970: item.time))
+        return "\(displayText(for: unit, decimalValue: item.value)) \(unit.spokenName), " +
+            String(localized: "starts at", comment: "Accessibility: schedule entry start time") + " \(timeString)"
     }
 }
 
@@ -350,6 +382,26 @@ enum TherapySettingUnit: String, CaseIterable {
             return "mmol/L"
         case .mgdL:
             return "mg/dL"
+        }
+    }
+
+    /// Fully spoken unit for VoiceOver. Localizable per case (so translations stay correct)
+    /// and grammatical — the denominator "unit" is singular, unlike the tokenized speller,
+    /// which is fed English keys and would pass translated abbreviations through unchanged.
+    var spokenName: String {
+        switch self {
+        case .mmolLPerUnit:
+            return String(localized: "millimoles per liter per unit", comment: "Accessibility: spoken unit")
+        case .mgdLPerUnit:
+            return String(localized: "milligrams per deciliter per unit", comment: "Accessibility: spoken unit")
+        case .unitPerHour:
+            return String(localized: "units per hour", comment: "Accessibility: spoken unit")
+        case .gramPerUnit:
+            return String(localized: "grams per unit", comment: "Accessibility: spoken unit")
+        case .mmolL:
+            return String(localized: "millimoles per liter", comment: "Accessibility: spoken unit")
+        case .mgdL:
+            return String(localized: "milligrams per deciliter", comment: "Accessibility: spoken unit")
         }
     }
 }

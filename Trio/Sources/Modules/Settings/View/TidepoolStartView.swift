@@ -38,6 +38,7 @@ struct TidepoolStartView: BaseView {
                                                 .foregroundColor(.green).font(.caption2)
                                                 .offset(x: 9, y: 6)
                                         }
+                                        .accessibilityHidden(true)
                                     }
                                 }
                                 .frame(maxWidth: .infinity, alignment: .center)
@@ -57,6 +58,8 @@ struct TidepoolStartView: BaseView {
                                 .font(.footnote)
                                 .foregroundColor(.secondary)
                                 .lineLimit(nil)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
                             Spacer()
                             Button(
                                 action: {
@@ -64,7 +67,7 @@ struct TidepoolStartView: BaseView {
                                 },
                                 label: {
                                     HStack {
-                                        Image(systemName: "questionmark.circle")
+                                        Image(systemName: "questionmark.circle").accessibilityLabel(Text("More information"))
                                     }
                                 }
                             ).buttonStyle(BorderlessButtonStyle())

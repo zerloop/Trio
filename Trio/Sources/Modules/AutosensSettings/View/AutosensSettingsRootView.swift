@@ -62,6 +62,14 @@ extension AutosensSettings {
                     .useNewFormula ? Text("Autosens") : Text("Dynamic Sensitivity")
             ) {
                 VStack {
+                    if state.settingsManager.settings.dosingMode == .basalTesting {
+                        DosingModeOverrideNote(
+                            mode: .basalTesting,
+                            message: String(localized: "Trio is holding sensitivity at 100% and ignoring these settings.")
+                        )
+                        .padding(.bottom, 8)
+                    }
+
                     let dynamicRatio = state.determinationsFromPersistence.first?.sensitivityRatio
                     let dynamicISF = state.determinationsFromPersistence.first?.insulinSensitivity
                     let newISF = state.autosensISF
@@ -99,6 +107,8 @@ extension AutosensSettings {
                         .font(.footnote)
                         .foregroundColor(.secondary)
                         .lineLimit(nil)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
                         Spacer()
                         Button(
                             action: {
@@ -108,7 +118,7 @@ extension AutosensSettings {
                             },
                             label: {
                                 HStack {
-                                    Image(systemName: "questionmark.circle")
+                                    Image(systemName: "questionmark.circle").accessibilityLabel(Text("More information"))
                                 }
                             }
                         ).buttonStyle(BorderlessButtonStyle())

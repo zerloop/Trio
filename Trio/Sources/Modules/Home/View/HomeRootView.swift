@@ -30,6 +30,8 @@ extension Home {
         @State var showQuickPickTreatmentsNoHistory = false
         @State var showPumpSelection: Bool = false
         @State var showCGMSelection: Bool = false
+        @State var pendingPump: PumpCatalogEntry?
+        @State var pendingCGM: CGMCatalogEntry?
         @State var showSnoozeSheet: Bool = false
         @State var showManualGlucose: Bool = false
         @State var showReleaseNotes: Bool = false
@@ -40,6 +42,16 @@ extension Home {
         @State var isRefreshArmed = false
         @State var isForcingLoop = false
         @State var notificationsDisabled = false
+        /// Date under the finger while the chart is scrubbed, else nil. Owned here because the
+        /// readout lives in the meal slot, outside the chart.
+        @State var chartSelection: Date? = nil
+        /// Last scrub position that resolved to a reading / a determination. The readout renders
+        /// from these, so holes decay instead of flickering the slot (see `updateChartReadout`).
+        /// They outlive the readout itself — it needs values to fade out with.
+        @State var chartReadoutDate: Date? = nil
+        @State var chartReadoutDeterminationDate: Date? = nil
+        /// Whether the readout owns the meal slot. The one thing the fade is keyed on.
+        @State var isChartReadoutVisible = false
 
         @FetchRequest(fetchRequest: OverrideStored.fetch(
             NSPredicate.lastActiveOverride,
@@ -79,7 +91,8 @@ extension Home {
                     displayXgridLines: state.displayXgridLines,
                     displayYgridLines: state.displayYgridLines,
                     thresholdLines: state.thresholdLines,
-                    state: state
+                    state: state,
+                    selection: $chartSelection
                 )
             }
             // enforce the zone budget; panes flex within it
@@ -91,24 +104,61 @@ extension Home {
             .overlay(alignment: .topTrailing) {
                 // borderless capsule (not a control); centered in the basal
                 // pane band so it clears the y-axis labels on every device size
-                if let rate = currentBasalRateLabel {
-                    Text(rate)
-                        .font(.system(size: 14, weight: .semibold))
-                        .fontDesign(.rounded)
-                        .foregroundStyle(Color.insulin)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Capsule().fill(.ultraThinMaterial))
-                        .frame(height: chartHeight * 0.10)
-                        .padding(.trailing, 16)
+                if let basal = currentBasalReadout {
+                    HStack(spacing: 3) {
+                        if basal.isManual {
+                            Image(systemName: "hand.raised.fill")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                        Text(basal.label)
+                            .font(.system(size: 14, weight: .semibold))
+                            .fontDesign(.rounded)
+                    }
+                    .foregroundStyle(basal.isManual ? Color.loopManualTemp : Color.insulin)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .glassMaterialFill(Capsule())
+                    .frame(height: chartHeight * 0.10)
+                    .padding(.trailing, 16)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(Text(basal.accessibilityLabel))
                 }
             }
         }
 
-        private var currentBasalRateLabel: String? {
-            guard let rate = state.tempBasals.last?.tempBasal?.rate else { return nil }
-            let value = Formatter.decimalFormatterWithTwoFractionDigits.string(from: rate) ?? "\(rate)"
+        /// Rate pill: what the pump delivers, and whether the temp is the user's own.
+        private var currentBasalReadout: (label: String, accessibilityLabel: String, isManual: Bool)? {
+            switch state.activeBasalDelivery {
+            case .none:
+                return nil
+            case .suspended:
+                let label = String(localized: "Suspended", comment: "Basal delivery suspended on the pump")
+                return (label, label, false)
+            case let .temp(rate):
+                let manual = state.manualTempBasal
+                let label = basalRateLabel(rate)
+                let spoken = manual
+                    ? String(
+                        localized: "Manual basal \(basalRateAccessibilityLabel(rate))",
+                        comment: "Accessibility: manual temp basal rate the user set on the pump"
+                    )
+                    : basalRateAccessibilityLabel(rate)
+                return (label, spoken, manual)
+            case let .scheduled(rate):
+                return (basalRateLabel(rate), basalRateAccessibilityLabel(rate), false)
+            }
+        }
+
+        private func basalRateLabel(_ rate: Decimal) -> String {
+            let value = Formatter.decimalFormatterWithTwoFractionDigits
+                .string(from: NSDecimalNumber(decimal: rate)) ?? "\(rate)"
             return value + String(localized: " U/hr", comment: "Unit per hour with space")
+        }
+
+        private func basalRateAccessibilityLabel(_ rate: Decimal) -> String {
+            let value = Formatter.decimalFormatterWithTwoFractionDigits
+                .string(from: NSDecimalNumber(decimal: rate)) ?? "\(rate)"
+            return value + " " + UnitSpelling.spoken("U/hr")
         }
 
         @ViewBuilder private var chartInfoButton: some View {
@@ -125,6 +175,7 @@ extension Home {
                         Circle()
                             .stroke(Color.primary.opacity(0.4), lineWidth: 2)
                     )
+                    .accessibilityLabel(Text("Chart legend"))
             }
             .buttonStyle(.plain)
             .contentShape(Circle())
@@ -137,6 +188,8 @@ extension Home {
             // viewport-sized content: rubber-bands for the pull-down, never scrolls
             ScrollView(.vertical, showsIndicators: false) {
                 dashboardContent(geo)
+                    .padding(.top, isForcingLoop ? HomeLayout.refreshIndicatorHeight : 0)
+                    .animation(.easeInOut(duration: 0.25), value: isForcingLoop)
                     .background(
                         GeometryReader { g in
                             Color.clear.preference(
@@ -177,26 +230,29 @@ extension Home {
                     {
                         BluetoothRequiredView()
                     } else {
-                        /// right panel with loop status and evBG
-                        HStack {
-                            Spacer()
-                            rightHeaderPanel()
-                        }.padding(.trailing, 20)
-
-                        /// glucose bobble
-                        glucoseView
-
-                        /// left panel with pump related info
-                        HStack {
+                        HStack(alignment: .center, spacing: 0) {
                             pumpView
-                            Spacer()
-                        }.padding(.leading, 20)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+
+                            glucoseView
+                                .frame(width: 130)
+
+                            rightHeaderPanel()
+                                .frame(maxWidth: .infinity, alignment: .trailing)
+                        }
+                        .padding(.horizontal, 20)
                     }
                 }
                 // fixed slot: header state changes never reflow the zones below
                 .frame(height: HomeLayout.headerHeight)
 
-                mealPanel().frame(height: HomeLayout.mealSlotHeight)
+                mealPanel()
+                    .frame(height: HomeLayout.mealSlotHeight)
+                    // Fades the readout in and out. Keyed on visibility, not on the date: a
+                    // scrub step leaves the flag alone, so only the swap animates and the
+                    // values inside keep updating unanimated.
+                    .animation(ChartSelectionLookup.readoutFade, value: isChartReadoutVisible)
+                    .task(id: chartSelection) { await updateChartReadout() }
 
                 mainChart(geo: geo)
             }
@@ -246,14 +302,14 @@ extension Home {
                     state.addManualGlucose(amount)
                 }
             }
-            // PUMP RELATED
-            .confirmationDialog("Pump Model", isPresented: $showPumpSelection) {
-                Button("Medtronic") { state.addPump(.minimed) }
-                Button("All Omnipod Types") { state.addPump(.omni) }
-                Button("Dana(RS/-i)") { state.addPump(.dana) }
-                Button("Medtrum Nano") { state.addPump(.medtrum) }
-                Button("Pump Simulator") { state.addPump(.simulator) }
-            } message: { Text("Select Pump Model") }
+            // DEVICE SELECTION (pump + CGM)
+            .devicePickers(
+                showPumpSelection: $showPumpSelection,
+                showCGMSelection: $showCGMSelection,
+                pendingPump: $pendingPump,
+                pendingCGM: $pendingCGM,
+                state: state
+            )
             .sheet(isPresented: $state.shouldDisplayPumpSetupSheet) {
                 if let pumpManager = state.provider.apsManager.pumpManager {
                     PumpConfig.PumpSettingsView(
@@ -262,9 +318,9 @@ extension Home {
                         completionDelegate: state,
                         setupDelegate: state
                     )
-                } else {
+                } else if let pumpEntry = state.setupPumpEntry {
                     PumpConfig.PumpSetupView(
-                        pumpType: state.setupPumpType,
+                        pumpEntry: pumpEntry,
                         pumpInitialSettings: state.pumpInitialSettings,
                         bluetoothManager: state.provider.apsManager.bluetoothManager!,
                         completionDelegate: state,
@@ -273,15 +329,9 @@ extension Home {
                 }
             }
             // CGM RELATED
-            .confirmationDialog("CGM Model", isPresented: $showCGMSelection) {
-                cgmSelectionButtons
-            } message: {
-                Text("Select CGM Model")
-            }
             .sheet(isPresented: $state.shouldDisplayCGMSetupSheet) {
                 switch state.cgmCurrent.type {
-                case .enlite,
-                     .nightscout,
+                case .nightscout,
                      .none,
                      .simulator,
                      .xdrip:
@@ -291,6 +341,7 @@ extension Home {
                         cgmCurrent: state.cgmCurrent,
                         deleteCGM: state.deleteCGM
                     )
+                    .environment(settingsSearchHighlight)
                 case .plugin:
                     if let fetchGlucoseManager = state.fetchGlucoseManager,
                        let cgmManager = fetchGlucoseManager.cgmManager,
@@ -334,13 +385,11 @@ extension Home {
                     let carbsRequiredBadge: String? = carbsRequiredBadgeValue
 
                     NavigationStack { mainView() }
-                        .tabItem { Label("", systemImage: "chart.xyaxis.line") }
+                        .tabItem { Label("", systemImage: "chart.xyaxis.line").accessibilityLabel(Text("Main")) }
                         .badge(carbsRequiredBadge).tag(0)
-                        .accessibilityLabel(Text("Main"))
 
                     NavigationStack { History.RootView(resolver: resolver) }
-                        .tabItem { Label("", systemImage: historySFSymbol) }.tag(1)
-                        .accessibilityLabel(Text("History"))
+                        .tabItem { Label("", systemImage: historySFSymbol).accessibilityLabel(Text("History")) }.tag(1)
 
                     Spacer()
                         // nbsp title + empty image: invisible item that still
@@ -357,8 +406,7 @@ extension Home {
                             Label(
                                 "",
                                 systemImage: "slider.horizontal.2.gobackward"
-                            ) }.tag(2)
-                        .accessibilityLabel(Text("Adjustments"))
+                            ).accessibilityLabel(Text("Adjustments")) }.tag(2)
 
                     NavigationStack(path: self.$settingsPath) {
                         Settings.RootView(resolver: resolver) }
@@ -366,8 +414,7 @@ extension Home {
                         .tabItem { Label(
                             "",
                             systemImage: "gear"
-                        ) }.tag(3)
-                        .accessibilityLabel(Text("Settings"))
+                        ).accessibilityLabel(Text("Settings")) }.tag(3)
                 }
                 .tint(Color.tabBar)
 
@@ -430,6 +477,22 @@ extension Home {
                     }
                 }
                 .accessibilityLabel(Text("Add Treatment"))
+                .accessibilityAddTraits(.isButton)
+                // the tap/long-press gestures are invisible to VoiceOver; expose both
+                .accessibilityAction {
+                    state.showModal(for: .treatmentView)
+                }
+                .accessibilityAction(named: Text("Quick Pick Treatments")) {
+                    guard state.enableQuickPickTreatments else { return }
+                    Task {
+                        await state.loadQuickPickTreatmentSuggestions()
+                        if state.quickPickBolusSuggestions.isEmpty, state.quickPickCarbSuggestions.isEmpty {
+                            showQuickPickTreatmentsNoHistory = true
+                        } else {
+                            showQuickPickTreatmentsPicker = true
+                        }
+                    }
+                }
         }
 
         private var carbsRequiredBadgeValue: String? {
